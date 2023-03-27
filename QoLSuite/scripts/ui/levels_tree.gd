@@ -100,9 +100,10 @@ func select_level(sel: TreeItem):
     if selected_item != null:
         initial_level = selected_item.get_meta("level")
         initial_viewport = selected_item.get_meta("viewport")
-        #initial_level.FloorRT.connect("tree_entered", self, "overwrite_FloorRT_size", [initial_level.FloorRT, initial_viewport.size])
-        initial_level.FloorTileCamera.connect("tree_entered", self, "overwrite_floor_tile_camera_zoom",
-                [initial_level.FloorTileCamera, Vector2(initial_viewport.size.x / initial_level.FloorRT.size.x, initial_viewport.size.y / initial_level.FloorRT.size.y)])
+        if initial_level.TileMap.get_used_cells().size() > 0:
+            initial_level.FloorRT.connect("tree_entered", self, "overwrite_FloorRT_size", [initial_level.FloorRT, initial_viewport.size])
+            initial_level.FloorTileCamera.connect("tree_entered", self, "overwrite_floor_tile_camera",
+                [initial_level.FloorTileCamera, Vector2(initial_viewport.size.x / 2, initial_viewport.size.y / 2)])
         transfer_level(initial_level, world, initial_viewport)
 
         var mesh: MeshInstance2D = selected_item.get_meta("mesh")
@@ -147,9 +148,10 @@ func overwrite_FloorRT_size(FloorRT: Viewport, size: Vector2):
     FloorRT.disconnect("tree_entered", self, "overwrite_FloorRT_size")
     FloorRT.size = size
 
-func overwrite_floor_tile_camera_zoom(camera: Camera2D, zoom: Vector2):
-    camera.disconnect("tree_entered", self, "overwrite_floor_tile_camera_zoom")
-    camera.zoom = zoom
+func overwrite_floor_tile_camera(camera: Camera2D, position: Vector2):
+    camera.disconnect("tree_entered", self, "overwrite_floor_tile_camera")
+    camera.zoom = Vector2(1, 1)
+    camera.position = position
 
 func refresh_z_and_alpha():
     # collect visible level items
