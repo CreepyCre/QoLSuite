@@ -16,12 +16,14 @@ var hovered_item: TreeItem = null
 var selected_item: TreeItem = null
 
 var world: Node2D
+var woxel_dimensions: Vector2
 var level_settings
 
 var level_to_item: Dictionary = {}
 
 func re_init(loader, world: Node2D, level_settings):
     self.world = world
+    self.woxel_dimensions = world.WoxelDimensions
     self.level_settings = level_settings
 
     add_icon_override("checked", loader.load_icon("eye_checked.png"))
@@ -78,6 +80,7 @@ func transfer_level(level: Node2D, source: Node, target: Node):
     if id != current_level_id:
         world.SetLevel(id, false)
 
+    prepare_level_before_exit_tree(level)
     source.remove_child(level)
     level.MeshLookup = {}
     target.add_child(level)
@@ -97,7 +100,7 @@ func _selected():
 func select_level(sel: TreeItem):
     var initial_level: Node2D
     var initial_viewport: Viewport
-    if selected_item != null:
+    if selected_item != null && is_instance_valid(selected_item.get_meta("level")):
         initial_level = selected_item.get_meta("level")
         initial_viewport = selected_item.get_meta("viewport")
         if initial_level.TileMap.get_used_cells().size() > 0:
@@ -120,6 +123,7 @@ func select_level(sel: TreeItem):
         return
     world.SetLevel(id, false)
 
+    prepare_level_before_exit_tree(level)
     selected_item.get_meta("viewport").remove_child(level)
     level.MeshLookup = {}
     world.add_child(level)
@@ -172,9 +176,9 @@ func refresh_z_and_alpha():
         else:
             var level: Node2D = selected_item.get_meta("level")
             level.modulate = alpha_color(item.get_range(COL_ALPHA))
-            z_index -= 500
+            z_index -= 900
             level.z_index = z_index
-            z_index -= 901
+            z_index -= 501
 
 func is_level_visible(item: TreeItem) -> bool:
     return item.is_checked(COL_VISIBLE)
@@ -187,7 +191,7 @@ func level_visibility_changed(item: TreeItem, level: Node2D):
         level.visible = true
         busy = false
         return
-    var is_visible = is_level_visible(level_to_item[level])
+    var is_visible = is_level_visible(item)
     if is_visible != level.visible:
         level.visible = is_visible
     busy = false
@@ -207,7 +211,24 @@ func _item_edited():
     refresh_z_and_alpha()
     busy = false
 
-func _process(delta):
+func _process(_delta):
+    if woxel_dimensions != world.WoxelDimensions:
+        woxel_dimensions = world.WoxelDimensions
+        for item in level_to_item.values():
+            var viewport: Viewport = item.get_meta("viewport")
+            var quad_mesh: QuadMesh = item.get_meta("mesh").mesh
+            quad_mesh.size = woxel_dimensions
+            quad_mesh.center_offset = Vector3(woxel_dimensions.x / 2, woxel_dimensions.y / 2, 0)
+            viewport.size = woxel_dimensions
+            if item == selected_item:
+                continue
+            var level: Node2D = item.get_meta("level")
+            if level.TileMap.get_used_cells().size() > 0:
+                overwrite_FloorRT_size(level.FloorRT, viewport.size)
+                overwrite_floor_tile_camera(level.FloorTileCamera, Vector2(viewport.size.x / 2, viewport.size.y / 2))
+            viewport.render_target_update_mode = Viewport.UPDATE_ONCE
+            call_deferred("update_once", viewport)
+
     var item: TreeItem = level_to_item[world.Level]
     if item != selected_item:
         busy = true
@@ -248,6 +269,7 @@ func delete_item(item: TreeItem):
                 continue
             world.SetLevel(id, false)
 
+            prepare_level_before_exit_tree(level)
             selected_item.get_meta("viewport").remove_child(level)
             level.MeshLookup = {}
             world.add_child(level)
@@ -357,6 +379,34 @@ func _gui_input(event: InputEvent):
     hovered_item = new_hovered_item
     if hovered_item != null:
         hovered_item.set_icon(COL_DRAG, drag)
+    
+func prepare_level_before_exit_tree(level: Node2D):
+    walls_tree_exiting(level.Walls)
+
+func walls_tree_exiting(walls: Node2D):
+    for wall in walls.get_children():
+        var portals: Array = []
+        for portal in wall.get_children():
+            if not "WallDistance" in portal:
+                continue
+            #portal.connect("tree_exited", self, "portal_tree_exited", [portal, wall])
+            wall.RemovePortal(portal)
+            wall.remove_child(portal)
+            portals.append(portal)
+        wall.connect("tree_entered", self, "wall_tree_entered", [wall, portals])
+
+func wall_tree_entered(wall: Node2D, portals):
+    wall.disconnect("tree_entered", self, "wall_tree_entered")
+    world.AssignNodeID(wall, wall.get_meta("node_id"))
+    for portal in portals:
+        wall.InsertPortal(portal, false)
+        world.AssignNodeID(portal, portal.get_meta("node_id"))
+    wall.RemakeLines()
+
+func portal_tree_exited(portal: Node2D, wall: Node2D):
+    wall.disconnect("tree_exited", self, "portal_tree_exited")
+    wall.InsertPortal(portal, true)
+    world.AssignNodeID(portal, portal.GetNodeID())
 
 func _unload():
     busy = true

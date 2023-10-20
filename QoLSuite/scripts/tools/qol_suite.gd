@@ -9,6 +9,8 @@ var level_settings_tree: Tree
 var menu_align
 var view_button
 
+var levels: Array = []
+
 func start():
     if (not Engine.has_signal("_lib_register_mod")):
         return
@@ -17,9 +19,11 @@ func start():
     self.Global.API.ModSignalingApi.connect("unload", self, "_unload")
 
     loader = self.Global.API.Util.create_loading_helper(self.Global.Root + "../../")
+    # Levels panel stuff
     levels_window = loader.load_scene("LevelsWindow").instance()
     var v_box = levels_window.get_node("VBoxContainer")
     levels_window.connect("resized", self, "levels_window_size_changed", [levels_window, v_box])
+    levels_window.connect("gui_input", self, "levels_window_gui_input", [levels_window])
     levels_tree = v_box.get_node("LevelsTree")
     levels_tree.set_script(loader.load_script("ui/levels_tree"))
     level_settings = self.Global.Editor.Tools["LevelSettings"]
@@ -91,9 +95,15 @@ func scene_tree_node_added(node: Node):
 
 func level_into_viewport(level: Node2D, move_top: bool = true):
     level.set_meta("has_been_viewported", true)
+    levels.append(level)
 
-    level.CaveMesh.connect("tree_entered", self, "cave_mesh_tree_entered", [level.CaveMesh])
+    level.CaveMesh.connect("tree_exiting", self, "cave_mesh_tree_exiting", [level.CaveMesh])
     level.Objects.connect("tree_entered", self, "objects_tree_entered", [level.Objects])
+    level.Terrain.connect("tree_exiting", self, "terrain_tree_exiting", [level.Terrain])
+    level.WaterMesh.connect("tree_entered", self, "water_mesh_tree_entered", [level.WaterMesh])
+    level.MaterialMeshes.connect("tree_entered", self, "material_meshes_tree_entered", [level.MaterialMeshes])
+
+    level.WasLoaded = true
 
     var size: Vector2 = self.Global.World.WoxelDimensions
     var mesh = MeshInstance2D.new()
@@ -119,21 +129,45 @@ func level_into_viewport(level: Node2D, move_top: bool = true):
     viewport.usage = Viewport.USAGE_2D
     viewport.fxaa = true
 
-    
-
+    if level.TileMap.get_used_cells().size() > 0:
+        level.FloorRT.connect("tree_entered", levels_tree, "overwrite_FloorRT_size", [level.FloorRT, viewport.size])
+        level.FloorTileCamera.connect("tree_entered", levels_tree, "overwrite_floor_tile_camera",
+            [level.FloorTileCamera, Vector2(viewport.size.x / 2, viewport.size.y / 2)])
     levels_tree.transfer_level(level, self.Global.World, viewport)
     levels_tree.create_level_item(level, mesh, viewport, texture, move_top)
 
     viewport.render_target_update_mode = Viewport.UPDATE_ONCE
 
-func cave_mesh_tree_entered(cave_mesh: MeshInstance2D):
+func cave_mesh_tree_exiting(cave_mesh: MeshInstance2D):
+    cave_mesh.connect("tree_entered", self, "cave_mesh_tree_entered", [cave_mesh, cave_mesh.entranceWidget])
+
+func cave_mesh_tree_entered(cave_mesh: MeshInstance2D, entranceWidget):
+    cave_mesh.disconnect("tree_entered", self, "cave_mesh_tree_entered")
     cave_mesh.remove_child(cave_mesh.entranceWidget)
-    cave_mesh.entranceWidget = cave_mesh.get_child(0)
+    cave_mesh.entranceWidget = entranceWidget
+    cave_mesh.UpdateMesh()
 
 func objects_tree_entered(objects: Node2D):
     for prop in objects.get_children():
         objects.AddToSearchTable(prop, false)
         prop.connect("tree_entered", self, "prop_tree_entered", [prop, prop.shadow, prop.Sprite])
+
+func terrain_tree_exiting(terrain: MeshInstance2D):
+    terrain.connect("tree_entered", self, "terrain_tree_entered", [terrain, terrain.mesh])
+
+func terrain_tree_entered(terrain: MeshInstance2D, mesh):
+    terrain.disconnect("tree_entered", self, "terrain_tree_entered")
+    terrain.mesh = mesh
+
+func water_mesh_tree_entered(water_mesh: MeshInstance2D):
+    # hmm yes, surely nothing could ever go wrong
+    water_mesh.Resize(0, 0, 0, 0)
+
+func material_meshes_tree_entered(material_meshes: Node2D):
+    for material_layer in material_meshes.get_children():
+        print(material_layer)
+        for material_mesh in material_layer.get_children():
+            material_mesh.call_deferred("ForceUpdateMesh")
 
 func prop_tree_entered(prop, shadow, sprite):
     prop.disconnect("tree_entered", self, "prop_tree_entered")
@@ -146,6 +180,14 @@ func prop_tree_entered(prop, shadow, sprite):
 
 func levels_window_size_changed(window: WindowDialog, v_box: VBoxContainer):
     v_box.rect_size = window.rect_size
+
+func levels_window_gui_input(event: InputEvent, window: WindowDialog):
+    if event is InputEventMouseButton and event.button_index == BUTTON_LEFT and not event.pressed:
+        var x: float = clamp(window.rect_position.x, 0, window.get_viewport().size.x - window.rect_size.x)
+        var y: float = clamp(window.rect_position.y, 28, window.get_viewport().size.y)
+        if x != window.rect_position.x or y != window.rect_position.y:
+            window.rect_position = Vector2(x, y)
+    
 
 func _unload():
     var floatbar_align: HBoxContainer = self.Global.Editor.get_node("Floatbar/Floatbar/Align")
