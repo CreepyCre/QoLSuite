@@ -11,6 +11,9 @@ var view_button
 
 var levels: Array = []
 
+# need to keep ref, otherwise the object gets yeeted
+var tool_panel_popout
+
 func start():
     if (not Engine.has_signal("_lib_register_mod")):
         return
@@ -19,6 +22,10 @@ func start():
     self.Global.API.ModSignalingApi.connect("unload", self, "_unload")
 
     loader = self.Global.API.Util.create_loading_helper(self.Global.Root + "../../")
+
+    # Tool Panel Popout
+    tool_panel_popout = loader.load_script("tool_panel_popout").new(self.Global.Editor, self.Global.API.InputMapApi.get_or_append_event_emitter(self.Global.Editor.Toolset))
+
     # Levels panel stuff
     levels_window = loader.load_scene("LevelsWindow").instance()
     var v_box = levels_window.get_node("VBoxContainer")
@@ -58,6 +65,9 @@ func start():
         level_into_viewport(level, false)
 
     self.Global.World.get_tree().connect("node_added", self, "scene_tree_node_added")
+
+func update(_delta):
+    tool_panel_popout.update(_delta)
 
 func view_id_pressed(id: int):
     match id:
