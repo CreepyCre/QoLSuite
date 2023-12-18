@@ -66,12 +66,12 @@ func create_level_item(level: Node2D, mesh: MeshInstance2D, move_top: bool = tru
 
     level_to_item[level] = level_tree_item
 
-    mesh.visible = is_level_visible(level_tree_item)
+    #mesh.visible = is_level_visible(level_tree_item)
 
     busy = false
 
-func alpha_color(alpha_percentage: float):
-    return Color(1, 1, 1, alpha_percentage / 100.0)
+func alpha_color(item: TreeItem):
+    return Color(1, 1, 1, 1 - item.get_range(COL_ALPHA) / 100.0)
 
 func _selected():
     if busy or selected_item == get_selected():
@@ -94,12 +94,12 @@ func select_level(sel: TreeItem):
 
 func refresh_z_and_alpha():
     var item: TreeItem = get_root().get_children()
-    var z_index: int = 3000
+    #var z_index: int = 3000
     while item != null:
-        var mesh: MeshInstance2D = item.get_meta("mesh")
-        mesh.modulate = alpha_color(item.get_range(COL_ALPHA))
-        mesh.z_index = z_index
-        z_index -= 1
+        #var mesh: MeshInstance2D = item.get_meta("mesh")
+        #mesh.modulate = alpha_color(item.get_range(COL_ALPHA))
+        #mesh.z_index = z_index
+        #z_index -= 1
         item = item.get_next()
         
 
@@ -112,8 +112,8 @@ func _item_edited():
     busy = true
     var item: TreeItem = get_edited()
     var column: int = get_edited_column()
-    if column == COL_VISIBLE:
-        item.get_meta("mesh").visible = is_level_visible(item)
+    #if column == COL_VISIBLE:
+        #item.get_meta("mesh").visible = is_level_visible(item)
     refresh_z_and_alpha()
     busy = false
 
@@ -161,7 +161,7 @@ func delete_item(item: TreeItem):
 
     var level: Node2D = item.get_meta("level")
     level_to_item.erase(level)
-    item.get_meta("mesh").queue_free()
+    #item.get_meta("mesh").queue_free()
     item.free()
 
 func get_drag_data(position: Vector2):
@@ -257,6 +257,6 @@ func _gui_input(event: InputEvent):
 func _unload():
     busy = true
     var item: TreeItem = get_root().get_children()
-    while item != null:
-        var mesh: MeshInstance2D = selected_item.get_meta("mesh")
-        mesh.queue_free()
+    #while item != null:
+    #    var mesh: MeshInstance2D = selected_item.get_meta("mesh")
+    #    mesh.queue_free()
