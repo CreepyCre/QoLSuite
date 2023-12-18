@@ -14,12 +14,15 @@ var level_settings_tree: Tree
 var canvas_layer: CanvasLayer = CanvasLayer.new()
 var back_buffer: BackBufferCopy = BackBufferCopy.new()
 var mesh: MeshInstance2D = MeshInstance2D.new()
+#var mesh: Sprite = Sprite.new()
 
 var buffer_viewport: Viewport = Viewport.new()
 var buffer_mesh: MeshInstance2D = MeshInstance2D.new()
 
 var menu_align
 var view_button
+
+var shader: Shader
 
 #var meshes_node: Node2D = Node2D.new()
 
@@ -77,13 +80,14 @@ func start():
     VisualServer.render_loop_enabled = false
     world_viewport = self.Global.World.owner.Viewport
     world_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+    #world_viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS
     #world_viewport.render_target_clear_mode = Viewport.CLEAR_MODE_NEVER
     #world_viewport.transparent_bg = false
     world_viewport_rid = world_viewport.get_viewport_rid()
     VisualServer.viewport_set_active(world_viewport_rid, false)
     master_viewport = self.Global.World.owner.get_viewport()
     #master_viewport.transparent_bg = false
-    master_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+    #master_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
     master_viewport_rid = master_viewport.get_viewport_rid()
 
     canvas_layer.layer = 10
@@ -95,9 +99,6 @@ func start():
     var quad_mesh: QuadMesh = QuadMesh.new()
     quad_mesh.size = size
     quad_mesh.center_offset = Vector3(size.x / 2, size.y / 2, 0)
-    quad_mesh.material = ShaderMaterial.new()
-    quad_mesh.material.shader = load(self.Global.Root + "../../shaders/ModulateMesh.shader")
-    print(quad_mesh.material.shader)
     mesh.mesh = quad_mesh
 
     canvas_layer.add_child(mesh)
@@ -105,21 +106,28 @@ func start():
 
     buffer_viewport.transparent_bg = true
     buffer_viewport.size = size
-    buffer_viewport.usage = Viewport.USAGE_3D
+    buffer_viewport.usage = Viewport.USAGE_2D
     buffer_viewport.disable_3d = true
-    buffer_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+    buffer_viewport.render_target_update_mode = Viewport.UPDATE_ALWAYS
     self.Global.World.owner.add_child(buffer_viewport)
     buffer_viewport.owner = self.Global.World.owner
 
+
+
     buffer_mesh.size = size
     buffer_mesh.mesh = quad_mesh
+    #buffer_mesh.material = CanvasItemMaterial.new()
+    #buffer_mesh.material.blend_mode = CanvasItem.BLEND_MODE_PREMULT_ALPHA
 
     buffer_viewport.add_child(buffer_mesh)
-    buffer_mesh.owener = buffer_viewport
+    buffer_mesh.owner = buffer_viewport
 
 
     buffer_mesh.texture = world_viewport.get_texture()
     mesh.texture = buffer_viewport.get_texture()
+    mesh.material = ShaderMaterial.new()
+    shader = load(self.Global.Root + "../../shaders/ModulateMesh.shader")
+    mesh.material.shader = shader
     
     #VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
     #VisualServer.force_draw(false)
@@ -157,20 +165,23 @@ func loop():
         
         VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), false)
         VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
-        VisualServer.viewport_set_clear_mode(world_viewport_rid, VisualServer.VIEWPORT_CLEAR_ONLY_NEXT_FRAME)
+        #VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+        #VisualServer.viewport_set_update_mode(buffer_viewport.get_viewport_rid(), VisualServer.VIEWPORT_UPDATE_ONCE)
         VisualServer.force_draw(false)
-        VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), true)
+        VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
 
         var items: Array = []
         var it: TreeItem = levels_tree.get_root().get_children()
         while it != null:
-            items.append(it)
+            if (levels_tree.is_level_visible(it)):
+                items.append(it)
             it = it.get_next()
         items.invert()
+        if (not items.empty()):
+            VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), true)
         for item in items:
-            if (not levels_tree.is_level_visible(item)):
-                continue
             var level: Node2D = item.get_meta("level")
+            #VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
             VisualServer.canvas_item_set_modulate(mesh.get_canvas_item(), levels_tree.alpha_color(item))
             VisualServer.canvas_item_set_visible(level.get_canvas_item(), true)
             VisualServer.viewport_set_update_mode(buffer_viewport.get_viewport_rid(), VisualServer.VIEWPORT_UPDATE_ONCE)
@@ -180,7 +191,7 @@ func loop():
             VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
             level.Lights.hide()
         # draw UI and level meshes
-        VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+        #VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
         VisualServer.force_draw()
         yield(self.Global.Editor.get_tree(), "idle_frame")
 

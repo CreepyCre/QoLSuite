@@ -68,7 +68,7 @@ func create_level_item(level: Node2D, move_top: bool = true):
     busy = false
 
 func alpha_color(item: TreeItem):
-    return Color(1, 1, 1, 1 - item.get_range(COL_ALPHA) / 100.0)
+    return Color(item.get_range(COL_ALPHA) / 100.0, 1, 1, 1)
 
 func _selected():
     if busy or selected_item == get_selected():
