@@ -12,6 +12,7 @@ var level_settings
 var level_settings_tree: Tree
 
 var canvas_layer: CanvasLayer = CanvasLayer.new()
+var back_buffer: BackBufferCopy = BackBufferCopy.new()
 var mesh: MeshInstance2D = MeshInstance2D.new()
 
 var buffer_viewport: Viewport = Viewport.new()
@@ -72,45 +73,39 @@ func start():
     view_button.get_popup().connect("id_pressed", self, "view_id_pressed")
     menu_align.add_child_below_node(menu_button, view_button)
 
+    # levels panel stuff
     VisualServer.render_loop_enabled = false
-    #self.Global.World.owner.ViewportContainer2D.visible = false
-    #self.Global.World.get_node("Bounds").color = Color8(255, 255, 255, 100)
-    #self.Global.World.remove_child(self.Global.World.get_node("Bounds"))
-    #self.Global.World.remove_child(self.Global.World.get_node("WorldUI"))
-    #self.Global.World.remove_child(self.Global.World.get_node("GridMesh"))
-    #self.Global.World.remove_child(self.Global.World.get_node("ExportFX"))
     world_viewport = self.Global.World.owner.Viewport
-    #world_viewport.remove_child(world_viewport.get_node("FilterSetup"))
-    #world_viewport.remove_child(world_viewport.get_node("WorldControl"))
-    world_viewport.connect("size_changed", self, "on_viewport_size_changed")
     world_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
-    world_viewport.render_target_clear_mode = Viewport.CLEAR_MODE_NEVER
-    world_viewport.transparent_bg = false
+    #world_viewport.render_target_clear_mode = Viewport.CLEAR_MODE_NEVER
+    #world_viewport.transparent_bg = false
     world_viewport_rid = world_viewport.get_viewport_rid()
     VisualServer.viewport_set_active(world_viewport_rid, false)
     master_viewport = self.Global.World.owner.get_viewport()
-    master_viewport.transparent_bg = false
+    #master_viewport.transparent_bg = false
     master_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
-    #master_viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS
     master_viewport_rid = master_viewport.get_viewport_rid()
-
-    #self.Global.World.owner.add_child(meshes_node)
-    #meshes_node.owner = self.Global.World.owner
 
     canvas_layer.layer = 10
     self.Global.World.add_child(canvas_layer)
+    canvas_layer.add_child(back_buffer)
+    back_buffer.owner = canvas_layer
 
     var size: Vector2 = world_viewport.size
     var quad_mesh: QuadMesh = QuadMesh.new()
     quad_mesh.size = size
     quad_mesh.center_offset = Vector3(size.x / 2, size.y / 2, 0)
+    quad_mesh.material = ShaderMaterial.new()
+    quad_mesh.material.shader = load(self.Global.Root + "../../shaders/ModulateMesh.shader")
+    print(quad_mesh.material.shader)
     mesh.mesh = quad_mesh
 
     canvas_layer.add_child(mesh)
     mesh.owner = canvas_layer
 
+    buffer_viewport.transparent_bg = true
     buffer_viewport.size = size
-    buffer_viewport.usage = Viewport.USAGE_2D
+    buffer_viewport.usage = Viewport.USAGE_3D
     buffer_viewport.disable_3d = true
     buffer_viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
     self.Global.World.owner.add_child(buffer_viewport)
@@ -143,49 +138,51 @@ func start():
 
     self.Global.World.get_tree().connect("node_added", self, "scene_tree_node_added")
 
+    loop()
 
 
 
 
 
-func update(_delta):
-    tool_panel_popout.update()
-    # draw each visible level separately storing the texture
-    levels_tree._update()
-    for level in self.Global.World.AllLevels:
-        VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
-    
-    VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), false)
-    VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
-    VisualServer.viewport_set_clear_mode(world_viewport_rid, VisualServer.VIEWPORT_CLEAR_ONLY_NEXT_FRAME)
-    VisualServer.force_draw(false)
-    VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), true)
 
-    var items: Array = []
-    var it: TreeItem = levels_tree.get_root().get_children()
-    while it != null:
-        items.append(it)
-        it = it.get_next()
-    items.invert()
-    for item in items:
-        if (not levels_tree.is_level_visible(item)):
-            continue
-        var level: Node2D = item.get_meta("level")
-        VisualServer.canvas_item_set_modulate(mesh.get_canvas_item(), levels_tree.alpha_color(item))
-        VisualServer.canvas_item_set_visible(level.get_canvas_item(), true)
-        VisualServer.viewport_set_update_mode(buffer_viewport.get_viewport_rid(), VisualServer.VIEWPORT_UPDATE_ONCE)
+func loop():
+    while true:
+        tool_panel_popout.update()
+        # draw each visible level separately storing the texture
+        levels_tree._update()
+        for level in self.Global.World.AllLevels:
+            level.show()
+            level.Lights.hide()
+            VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
+        
+        VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), false)
         VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+        #VisualServer.viewport_set_clear_mode(world_viewport_rid, VisualServer.VIEWPORT_CLEAR_ONLY_NEXT_FRAME)
         VisualServer.force_draw(false)
-        #var image: Image = VisualServer.texture_get_data(VisualServer.viewport_get_texture(world_viewport_rid))
-        #VisualServer.texture_set_data(mesh.texture.get_rid(), image)
-        #VisualServer.canvas_item_set_visible(item.get_meta("mesh").get_canvas_item(), true)
-        VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
-    # draw UI and level meshes
-    VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
-    VisualServer.force_draw()
+        VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), true)
 
-func on_viewport_size_changed():
-    pass # TODO
+        var items: Array = []
+        var it: TreeItem = levels_tree.get_root().get_children()
+        while it != null:
+            items.append(it)
+            it = it.get_next()
+        items.invert()
+        for item in items:
+            if (not levels_tree.is_level_visible(item)):
+                continue
+            var level: Node2D = item.get_meta("level")
+            VisualServer.canvas_item_set_modulate(mesh.get_canvas_item(), levels_tree.alpha_color(item))
+            VisualServer.canvas_item_set_visible(level.get_canvas_item(), true)
+            VisualServer.viewport_set_update_mode(buffer_viewport.get_viewport_rid(), VisualServer.VIEWPORT_UPDATE_ONCE)
+            VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+            level.Lights.show()
+            VisualServer.force_draw(false)
+            VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
+            level.Lights.hide()
+        # draw UI and level meshes
+        VisualServer.viewport_set_update_mode(master_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+        VisualServer.force_draw()
+        yield(self.Global.Editor.get_tree(), "idle_frame")
 
 func view_id_pressed(id: int):
     match id:
@@ -263,7 +260,7 @@ func prepare_level_mesh(level: Node2D, move_top: bool = true):
     #mesh.texture = texture
     #VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
 
-    levels_tree.create_level_item(level, null, move_top)
+    levels_tree.create_level_item(level, move_top)
 
 func levels_window_size_changed(window: WindowDialog, v_box: VBoxContainer):
     v_box.rect_size = window.rect_size

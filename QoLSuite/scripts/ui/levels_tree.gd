@@ -38,14 +38,13 @@ func re_init(loader, world: Node2D, level_settings):
     connect("item_edited", self, "_item_edited")
     busy = false
 
-func create_level_item(level: Node2D, mesh: MeshInstance2D, move_top: bool = true):
+func create_level_item(level: Node2D, move_top: bool = true):
     busy = true
 
     var level_tree_item: TreeItem = create_item()
     if move_top:
         level_tree_item.move_to_top()
     level_tree_item.set_meta("level", level)
-    level_tree_item.set_meta("mesh", mesh)
     level_tree_item.set_meta("alpha", 1.0)
 
     level_tree_item.set_icon(COL_DRAG, null)
@@ -65,8 +64,6 @@ func create_level_item(level: Node2D, mesh: MeshInstance2D, move_top: bool = tru
     level_tree_item.set_checked(COL_VISIBLE, true if world.Level == level else false)
 
     level_to_item[level] = level_tree_item
-
-    #mesh.visible = is_level_visible(level_tree_item)
 
     busy = false
 
