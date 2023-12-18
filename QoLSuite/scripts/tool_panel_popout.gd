@@ -27,7 +27,7 @@ func _init(editor: CanvasLayer, input_event_emitter):
 
         tool_bar.add_child_below_node(tool_bar.get_node("Spacer"), popout_button)
 
-func update(_delta):
+func update():
     tool_focus_accepted = false
 
 func obtain_tool_focus() -> bool:
