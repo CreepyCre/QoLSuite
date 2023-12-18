@@ -156,8 +156,8 @@ func loop():
             VisualServer.canvas_item_set_visible(level.get_canvas_item(), false)
         
         VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), false)
-        VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
-        #VisualServer.viewport_set_clear_mode(world_viewport_rid, VisualServer.VIEWPORT_CLEAR_ONLY_NEXT_FRAME)
+        #VisualServer.viewport_set_update_mode(world_viewport_rid, VisualServer.VIEWPORT_UPDATE_ONCE)
+        VisualServer.viewport_set_clear_mode(world_viewport_rid, VisualServer.VIEWPORT_CLEAR_ONLY_NEXT_FRAME)
         VisualServer.force_draw(false)
         VisualServer.canvas_item_set_visible(mesh.get_canvas_item(), true)
 
