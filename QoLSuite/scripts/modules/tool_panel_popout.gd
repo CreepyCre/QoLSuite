@@ -27,7 +27,7 @@ func _init(editor: CanvasLayer, input_event_emitter):
 
         tool_bar.add_child_below_node(tool_bar.get_node("Spacer"), popout_button)
 
-func update():
+func update(_delta):
     tool_focus_accepted = false
 
 func obtain_tool_focus() -> bool:
@@ -59,7 +59,7 @@ func closed(tool_panel, tool_name: String):
         return
     current_tool_panel = tool_panel_from_name(opened_tool_name)
     active_tool_name = opened_tool_name
-    tool_panel.Hide()
+    tool_panel.hide()
     if opened_tool_name != null:
         editor.Toolset.Quickswitch(opened_tool_name)
     else:
@@ -85,7 +85,7 @@ func tools_input(event: InputEvent, _emitter):
 
 func update_active_tool(tool_panel, tool_name: String):
     if current_tool_panel != null && current_tool_panel.visible:
-        current_tool_panel.Hide()
+        current_tool_panel.hide()
         current_tool_panel.show()
     current_tool_panel = tool_panel
     active_tool_name = tool_name
