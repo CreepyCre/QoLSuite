@@ -7,22 +7,23 @@ const COL_PREVIEW = 1
 const COL_ALPHA = 2
 const COL_VISIBLE = 3
 
-var busy: bool = true
-
 var drag: Texture
 
 var dragged_item: TreeItem = null
 var hovered_item: TreeItem = null
+var preview_level: Node2D = null
 var selected_item: TreeItem = null
 
 var world: Node2D
 var level_settings
+var texture_provider: FuncRef
 
 var level_to_item: Dictionary = {}
 
-func re_init(loader, world: Node2D, level_settings):
+func re_init(loader, world: Node2D, level_settings, texture_provider: FuncRef):
     self.world = world
     self.level_settings = level_settings
+    self.texture_provider = texture_provider
 
     add_icon_override("checked", loader.load_icon("eye_checked.png"))
     add_icon_override("unchecked", loader.load_icon("eye_unchecked.png"))
@@ -35,12 +36,9 @@ func re_init(loader, world: Node2D, level_settings):
     create_item()
 
     connect("item_selected", self, "_selected")
-    connect("item_edited", self, "_item_edited")
-    busy = false
+    connect("mouse_exited", self, "_mouse_exited")
 
 func create_level_item(level: Node2D, move_top: bool = true):
-    busy = true
-
     var level_tree_item: TreeItem = create_item()
     if move_top:
         level_tree_item.move_to_top()
@@ -49,7 +47,6 @@ func create_level_item(level: Node2D, move_top: bool = true):
 
     level_tree_item.set_icon(COL_DRAG, null)
 
-    #level_tree_item.set_icon(COL_PREVIEW, texture)
     level_tree_item.set_icon_max_width (COL_PREVIEW, 50)
 
     level_tree_item.set_cell_mode(COL_ALPHA, TreeItem.CELL_MODE_RANGE)
@@ -65,20 +62,19 @@ func create_level_item(level: Node2D, move_top: bool = true):
 
     level_to_item[level] = level_tree_item
 
-    busy = false
-
 func alpha_color(item: TreeItem):
     return Color(item.get_range(COL_ALPHA) / 100.0, 1, 1, 1)
 
 func _selected():
-    if busy or selected_item == get_selected():
+    if selected_item == get_selected():
         return
-    busy = true
     select_level(get_selected())
-    busy = false
 
 func select_level(sel: TreeItem):
-    var initial_level: Node2D
+    if (selected_item != null and is_instance_valid(selected_item)):
+        var prev_level: Node2D = selected_item.get_meta("level")
+        if (is_instance_valid(prev_level)):
+            selected_item.set_icon(COL_PREVIEW, texture_provider.call_func(prev_level))
     selected_item = sel
     var level: Node2D = selected_item.get_meta("level")
 
@@ -87,51 +83,21 @@ func select_level(sel: TreeItem):
         selected_item = null
         return
     world.SetLevel(id, false)
-    #refresh_z_and_alpha()
-
-func refresh_z_and_alpha():
-    var item: TreeItem = get_root().get_children()
-    #var z_index: int = 3000
-    while item != null:
-        #var mesh: MeshInstance2D = item.get_meta("mesh")
-        #mesh.modulate = alpha_color(item.get_range(COL_ALPHA))
-        #mesh.z_index = z_index
-        #z_index -= 1
-        item = item.get_next()
         
 
 func is_level_visible(item: TreeItem) -> bool:
     return item.is_checked(COL_VISIBLE)
-    
-func _item_edited():
-    if busy:
-        return
-    busy = true
-    var item: TreeItem = get_edited()
-    var column: int = get_edited_column()
-    #if column == COL_VISIBLE:
-        #item.get_meta("mesh").visible = is_level_visible(item)
-    refresh_z_and_alpha()
-    busy = false
 
 func _update():
     var item: TreeItem = level_to_item[world.Level]
     if item != selected_item:
-        busy = true
         select_level(item)
-        busy = false
     item = get_root().get_children()
-    var dirty: bool = false
     while item != null:
         var next = item.get_next()
         if not is_instance_valid(item.get_meta("level")):
-            busy = true
             delete_item(item)
-            busy = false
-            dirty = true
         item = next
-    if dirty:
-        refresh_z_and_alpha()
     
     
     if selected_item != null and not selected_item.is_selected(1):
@@ -199,7 +165,6 @@ func drop_data(position, item):
             else:
                 move_item_to_index(item, target_index)
                 move_item_to_index(target_item, item_index)
-    refresh_z_and_alpha()
 
     var tree_item: TreeItem = level_settings.tree.get_root().get_children()
     while tree_item != null:
@@ -240,20 +205,38 @@ func move_item_to_index(item: TreeItem, index: int):
         items[i].move_to_top()
 
 func _gui_input(event: InputEvent):
-    if not event is InputEventMouseMotion:
-        return
-    var new_hovered_item: TreeItem = get_item_at_position(event.position)
-    if hovered_item == new_hovered_item:
-        return
+    if event is InputEventMouseMotion:
+        var new_hovered_item: TreeItem = get_item_at_position(event.position)
+        var column: int = get_column_at_position(event.position)
+
+        if new_hovered_item != null and ((column == COL_DRAG) or (column == COL_PREVIEW)):
+            preview_level = new_hovered_item.get_meta("level")
+        else:
+            preview_level = null
+
+        if hovered_item == new_hovered_item:
+            return
+        if hovered_item != null:
+            hovered_item.set_icon(COL_DRAG, null)
+        hovered_item = new_hovered_item
+        if hovered_item != null:
+            hovered_item.set_icon(COL_DRAG, drag)
+    if (event is InputEventMouseButton and event.pressed):
+        var item: TreeItem = get_item_at_position(event.position)
+        if (item == null):
+            return
+        var column: int = get_column_at_position(event.position)
+        if (column != COL_ALPHA):
+            return
+        match event.button_index:
+            BUTTON_WHEEL_UP:
+                item.set_range(COL_ALPHA, clamp(item.get_range(COL_ALPHA) + 5, 0, 100))
+            BUTTON_WHEEL_DOWN:
+                item.set_range(COL_ALPHA, clamp(item.get_range(COL_ALPHA) - 5, 0, 100))
+        
+
+func _mouse_exited():
     if hovered_item != null:
         hovered_item.set_icon(COL_DRAG, null)
-    hovered_item = new_hovered_item
-    if hovered_item != null:
-        hovered_item.set_icon(COL_DRAG, drag)
-
-func _unload():
-    busy = true
-    var item: TreeItem = get_root().get_children()
-    #while item != null:
-    #    var mesh: MeshInstance2D = selected_item.get_meta("mesh")
-    #    mesh.queue_free()
+        hovered_item = null
+        preview_level = null
