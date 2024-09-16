@@ -11,8 +11,9 @@ var drag: Texture
 
 var dragged_item: TreeItem = null
 var hovered_item: TreeItem = null
-var preview_level: Node2D = null
 var selected_item: TreeItem = null
+
+var preview_level: Node2D = null
 
 var world: Node2D
 var level_settings
@@ -86,7 +87,7 @@ func select_level(sel: TreeItem):
         
 
 func is_level_visible(item: TreeItem) -> bool:
-    return item.is_checked(COL_VISIBLE)
+    return item.is_checked(COL_VISIBLE) and item.get_range(COL_ALPHA) > 0
 
 func _update():
     var item: TreeItem = level_to_item[world.Level]
@@ -124,7 +125,6 @@ func delete_item(item: TreeItem):
 
     var level: Node2D = item.get_meta("level")
     level_to_item.erase(level)
-    #item.get_meta("mesh").queue_free()
     item.free()
 
 func get_drag_data(position: Vector2):
