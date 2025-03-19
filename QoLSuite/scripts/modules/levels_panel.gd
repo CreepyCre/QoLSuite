@@ -134,8 +134,14 @@ func _init(loader, world: Node2D, editor: CanvasLayer, master_node: Node):
 
     # connect to world tree node added
     master_node.get_tree().connect("node_added", self, "scene_tree_node_added")
+    # connect to GridMesh hide
+    world.GridMesh.connect("hide", self, "update_grid_mesh", [world.GridMesh])
+    
 
     render_loop()
+
+func update_grid_mesh(grid_mesh):
+    grid_mesh.update()
 
 func render_loop():
     while true:
@@ -256,6 +262,8 @@ func levels_window_gui_input(event: InputEvent, window: WindowDialog):
 func unload():
     # disconnect from tree node added
     master_node.get_tree().disconnect("node_added", self, "scene_tree_node_added")
+    # disconnect from GridMesh hide
+    world.grid_mesh.disconnect("hide", self, "update_grid_mesh")
 
     var floatbar_align: HBoxContainer = editor.get_node("Floatbar/Floatbar/Align")
     floatbar_align.get_node("LevelOptions").show()
